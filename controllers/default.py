@@ -1,0 +1,419 @@
+# -*- coding: utf-8 -*-
+# this file is released under public domain and you can use without limitations
+
+#########################################################################
+## This is a sample controller
+## - index is the default action of any application
+## - user is required for authentication and authorization
+## - download is for downloading files uploaded in the db (does streaming)
+## - call exposes all registered services (none by default)
+#########################################################################
+from loadxls import load
+from spiaceReport import spiaceReport
+import datetime
+import os
+
+multiSelect = False
+
+def index():
+    global multiSelect
+    multiSelect = False
+    queryStr = (db.reviews.failureId == db.failures.id)&(db.failures.testcaseId == db.testcases.id)&(db.failures.runId == db.runs.id)&(db.failures.moduleId == db.modules.id)&(db.runs.jobId == db.jobs.id)&(db.jobs.beingFixed != 'on')
+    return buildGrid(queryStr)
+
+def indexMultiCreate():
+    global multiSelect
+    multiSelect = True
+    queryStr = (db.reviews.failureId == db.failures.id)&(db.failures.testcaseId == db.testcases.id)&(db.failures.runId == db.runs.id)&(db.failures.moduleId == db.modules.id)&(db.runs.jobId == db.jobs.id)&(db.jobs.beingFixed != 'on')
+    return buildGrid(queryStr)
+
+def beingFixed():
+    multiSelect = False
+    queryStr = (db.reviews.failureId == db.failures.id)&(db.failures.testcaseId == db.testcases.id)&(db.failures.runId == db.runs.id)&(db.failures.moduleId == db.modules.id)&(db.runs.jobId == db.jobs.id)&(db.jobs.beingFixed == 'on')
+    return buildGrid(queryStr)
+
+def testcaseGrid(testcaseIdList, searchable=True):
+    print testcaseIdList
+    #multiSelect = False  # multiselect turned off in buildGrid for first draft
+    queryStr = (db.failures.testcaseId.belongs(testcaseIdList))&(db.reviews.failureId == db.failures.id)&(db.failures.testcaseId == db.testcases.id)&(db.failures.runId == db.runs.id)&(db.failures.moduleId == db.modules.id)&(db.runs.jobId == db.jobs.id)&(db.jobs.beingFixed != 'on')
+    return buildGrid(queryStr, searchable)['grid']
+
+def failureIdGrid(failureIdList):
+    queryStr = (db.reviews.failureId.belongs(failureIdList))&(db.reviews.failureId == db.failures.id)&(db.failures.testcaseId == db.testcases.id)&(db.failures.runId == db.runs.id)&(db.failures.moduleId == db.modules.id)&(db.runs.jobId == db.jobs.id)&(db.jobs.beingFixed != 'on')
+    return buildGrid(queryStr)['grid']
+
+def buildGrid(queryStr, searchable=True):
+    global multiSelect
+    # Manual push-button sync
+    '''sync=FORM('Sync:', INPUT(_type='submit', _value='Sync'))
+    if sync.accepts(request,session):
+        print 'SYNCING ...'
+        filename = os.path.join(request.folder, 'modules\spiaceReport', 'spiaceConfig.ini')
+        spiaceReport.runSync(filename)
+        response.flash = 'Running sync'''
+    
+    # Today
+    date_today = datetime.datetime.now()
+    today = date_today.strftime('%Y.%m.%d')
+    
+    # Yesterday
+    date_yesterday = date_today - datetime.timedelta(days=1)
+    yesterday = date_yesterday.strftime('%Y.%m.%d')
+    
+    # Grid
+    db.reviews.id.readable=False # Since we do not want to expose the id field on the grid
+    db.reviews.id.writable=False
+    db.reviews.failureId.readable=False
+    db.reviews.failureId.writable=False
+    db.reviews.reviewDate.writable=False
+    db.reviews.latest.writable=False
+    db.runs.id.readable=False
+    db.runs.id.writable=False
+    db.runs.runLink.readable=False
+    db.testcases.id.readable=False
+    db.testcases.id.writable=False
+    db.testcases.testcaseLink.readable=False
+    db.failures.id.readable=False
+    db.failures.id.writable=False
+    db.failures.testcaseId.readable=False
+    db.failures.failLink.readable=False
+    db.modules.id.readable=False
+    db.modules.id.writable=False
+    db.jobs.id.readable=False
+    db.jobs.id.writable=False
+
+    #Define the query object
+    query=(queryStr)
+
+    #Define the fields to show on grid. Note: (you need to specify id field in fields section in 1.99.2
+    # this is not required in later versions)
+    fields = (db.jobs.jobName,
+              db.runs.build, db.runs.date, db.runs.runLink,
+              db.modules.moduleName, 
+              db.testcases.testcaseName, db.testcases.testcaseLink,
+              db.failures.testcaseId, db.failures.failStatus, db.failures.failLink, 
+              db.reviews.id, db.reviews.failureId, db.reviews.reviewDate, db.reviews.user, db.reviews.failure, db.reviews.occurrence, db.reviews.reason, db.reviews.action, db.reviews.notes,
+              db.failures.failCnt)
+
+    db.jobs.jobName.represent = lambda val,row: A(val, _href=row.runs.runLink) if row.runs.runLink is not None else val
+    db.testcases.testcaseName.represent = lambda val,row: A(val, _href=row.testcases.testcaseLink) if row.testcases.testcaseLink is not None else val
+    db.failures.failStatus.represent = lambda val,row: A(val, _href=row.failures.failLink) if row.failures.failLink is not None else val
+    
+    #Define headers as tuples/dictionaries
+    headers = {'jobs.jobName': 'Job Name',
+               'runs.build': 'Build',
+               'runs.date': 'Date',
+               'modules.moduleName': 'Module',
+               'testcases.testcaseName': 'Test Case',
+               'failures.failStatus': '',
+               'reviews.reviewDate': 'Review Date',
+               'reviews.user': 'User',
+               'reviews.failure': 'Failure',
+               'reviews.occurrence': 'Occurrence',
+               'reviews.reason': 'Reason',
+               'reviews.action': 'Action',
+               'reviews.notes': 'Notes',
+               'failures.failCnt': '#'}
+    '''{'jobs.jobName':{'label':'Job Name', 'class':'th', 'width':'150', 'truncate':25, 'selected':False}, 
+               'jobs.beingFixed':{'label':'User', 'class':'th', 'width':'30', 'truncate':25, 'selected':False}, 
+               'reviews.failure':{'label':'Failure', 'class':'th', 'width':'500', 'truncate':250, 'selected':False}, 
+               'reviews.occurrence':{'label':'Occurrence', 'class':'th', 'width':'50', 'truncate':15, 'selected':False}, 
+               'reviews.reason':{'label':'Reason', 'class':'th', 'width':'500', 'truncate':100, 'selected':False}, 
+               'reviews.action':{'label':'Action', 'class':'th', 'width':'65', 'truncate':50, 'selected':False}, 
+               'reviews.notes':{'label':'Notes', 'class':'th', 'width':'500', 'truncate':500, 'selected':False}}'''
+    
+    #Let's specify a default sort order
+    default_sort_order=[~db.runs.date|~db.reviews.reviewDate]
+
+    # Export classes
+    exportclasses=dict(
+        csv_with_hidden_cols=False,
+        xml=False,
+        html=False,
+        csv=False,
+        json=False,
+        tsv_with_hidden_cols=False,
+        tsv=False)
+    
+    selectable = False
+    links = [lambda row: linksHelper(row)]
+    if multiSelect:
+        selectable = lambda ids: redirect(URL('default','multicreate',args=ids))
+        links = False
+        
+    # build grid object 
+    grid = SQLFORM.grid(searchable=searchable, query=query, fields=fields, headers=headers, orderby=default_sort_order, groupby=db.reviews.failureId, details=False, links=links, create=False, deletable=False, editable=False, selectable=selectable, exportclasses=exportclasses, maxtextlength=250, paginate=25, user_signature=False)
+
+    form=FORM('Load Report:',
+        INPUT(_type='file', _name='reportFile', requires=IS_NOT_EMPTY()),
+        INPUT(_type='submit', _value='Load Report'))
+
+    loaded = None
+    if form.accepts(request,session):
+        response.flash = 'form accepted'
+        filename = request.vars.reportFile.filename
+        data = request.vars.reportFile.file.read()
+        xlsLoader = load.XlsLoader()
+        loadComplete = xlsLoader.load(filename, data)
+        if loadComplete is not None:
+            loaded = 'File ' + filename + ' is loaded'
+        else:
+            loaded = 'File ' + filename + ' failed to load'
+    elif form.errors:
+        response.flash = 'form has errors'
+    
+    grid.elements(_class='w2p_export_menu',replace=None)
+    return dict(form=form, loaded=loaded, grid=grid, today=today, yesterday=yesterday)#, email=email) # ,sync=sync)
+
+
+def linksHelper(row):
+    html_code = A('Filter',_href=URL("default","index",vars={'keywords' : 'testcases.testcaseName="' + row.testcases.testcaseName + '"' }, url_encode=True))
+    html_code = html_code + BR()
+    html_code = html_code + A('Create',_href=URL("default","create",args=[row.reviews.failureId]))
+    return html_code
+
+def reviewView (failId, update=False):
+    reviewIds = db(db.reviews.failureId==failId).select(db.reviews.id, db.reviews.failureId, db.reviews.reviewDate, db.reviews.user,db.reviews.failure, db.reviews.occurrence, db.reviews.reason, db.reviews.action, db.reviews.notes, orderby=~db.reviews.reviewDate)
+    if len(reviewIds) == 1 and reviewIds[0].failure == '':
+        row = reviewIds[0]
+        redirect(URL("default", "edit", args=[row.id, row.failureId, True]))
+
+    columns = ['reviews.reviewDate', 'reviews.user', 'reviews.failure', 'reviews.occurrence', 'reviews.reason', 'reviews.action', 'reviews.notes']
+
+    headers = {'reviews.reviewDate':{'label':'Date', 'class':'th', 'width':'25', 'truncate':25, 'selected':False}, 
+               'reviews.user':{'label':'User', 'class':'th', 'width':'10', 'truncate':10, 'selected':False}, 
+               'reviews.failure':{'label':'Failure', 'class':'th', 'width':'500', 'truncate':1000, 'selected':False}, 
+               'reviews.occurrence':{'label':'Occurrence', 'class':'th', 'width':'50', 'truncate':15, 'selected':False}, 
+               'reviews.reason':{'label':'Reason', 'class':'th', 'width':'500', 'truncate':1000, 'selected':False}, 
+               'reviews.action':{'label':'Action', 'class':'th', 'width':'65', 'truncate':50, 'selected':False},
+               'reviews.notes':{'label':'Notes', 'class':'th', 'width':'500', 'truncate':1000, 'selected':False}}
+    
+    extracolumns = [{'label':'',
+                'class': '', #class name of the header
+                'width':'', #width in pixels or %
+                'content':lambda row, rc: A('Edit',_href=URL("default", "edit", args=[row.id, row.failureId])),
+                'selected': False #agregate class selected to this column
+                }]
+    
+    form = SQLTABLE(reviewIds, headers=headers, columns=columns, extracolumns=extracolumns)
+    return (form, reviewIds[0])
+
+
+def view():
+    failureId = request.args(0)
+    
+    # Multi-select grid
+    tcId = db((db.failures.id==failureId)&(db.failures.testcaseId==db.testcases.id)).select(db.testcases.id)[0].id
+    multiSelectGrid = testcaseGrid([tcId])
+    multiSelectGrid.elements(_type='submit',_value='Submit',replace=None)  #remove selectable's checkboxes
+    multiSelectGrid.elements(_class='w2p_export_menu',replace=None)
+    
+    form = reviewView(failureId)[0]
+    return dict(form=form, grid=multiSelectGrid)
+
+def create():
+    showTable = True
+    if len(request.args) > 1:
+        showTable = False
+
+    failureId = request.args(0)
+    reviewRet = reviewView(failureId)
+    table = reviewRet[0]
+    prevReview = reviewRet[1]
+    
+    # Multi-select grid
+    tcId = db((db.failures.id==failureId)&(db.failures.testcaseId==db.testcases.id)).select(db.testcases.id)[0].id
+    multiSelectGrid = testcaseGrid([tcId], False)
+    multiSelectGrid.elements(_type='submit',_value='Submit',replace=None)  #remove selectable's checkboxes
+    multiSelectGrid.elements(_class='w2p_export_menu',replace=None)
+    
+    # Load info from previous review
+    db.reviews.occurrence.default = prevReview.occurrence
+    db.reviews.failure.default = prevReview.failure
+    db.reviews.reason.default = prevReview.reason
+    db.reviews.action.default = prevReview.action
+    db.reviews.notes.default = prevReview.notes
+    
+    db.reviews.failureId.default = failureId
+    db.reviews.reviewDate.default = datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+    db.reviews.latest.default = True
+    db.reviews.id.readable=False
+    db.reviews.id.writable=False
+    db.reviews.failureId.readable=False
+    db.reviews.failureId.writable=False
+    db.reviews.reviewDate.writable=False
+    db.reviews.latest.readable=False
+    db.reviews.latest.writable=False
+    form = SQLFORM(db.reviews)
+    if form.process().accepted:
+        latestPerFailure = db((db.reviews.failureId == failureId)&(db.reviews.latest == True)&(db.reviews.id != form.vars.id)).select()
+        for rev in latestPerFailure:
+            rec = dict(rev)
+            rec['latest'] = False
+            rev.update_record(**rec)
+        response.flash = 'form accepted'
+        table = reviewView(failureId, True)[0]
+        redirect(URL('index'))
+    elif form.errors:
+        mGrid = multiSelectGrid.element('web2py_grid')
+        selected = multiSelectGrid.elements(_name='records',_type='checkbox')
+        response.flash = 'form has errors'
+    else:
+        response.flash = 'please fill the form'
+    
+    return dict(form=form, table=table, grid=multiSelectGrid)
+
+def multicreate():
+    tcList = list()
+    failIdList = request.args
+
+    # Multi-select grid
+    multiSelectGrid = failureIdGrid(failIdList)
+    multiSelectGrid.elements(_type='submit',_value='Submit',replace=None)  #remove selectable's checkboxes
+    multiSelectGrid.elements(_class='w2p_export_menu',replace=None)
+    
+    db.reviews.reviewDate.default = datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+    db.reviews.latest.default=True
+    db.reviews.id.readable=False
+    db.reviews.id.writable=False
+    db.reviews.failureId.readable=False
+    db.reviews.failureId.writable=False
+    db.reviews.reviewDate.writable=False
+    db.reviews.latest.readable=False
+    db.reviews.latest.writable=False
+    form = SQLFORM(db.reviews)
+    if form.process().accepted:
+        for failId in failIdList:
+            reviewIds = db(db.reviews.failureId == failId).select()
+            if len(reviewIds) == 1 and reviewIds[0].failure == '':
+                row = reviewIds[0]
+                record = dict(form.vars)
+                record['reviewDate'] = db.reviews.reviewDate.default
+                record['failureId'] = failId
+                record['latest'] = True
+                row.update_record(**record)
+            else:
+                record = dict(form.vars)
+                record['id'] = ''
+                record['reviewDate'] = db.reviews.reviewDate.default
+                record['failureId'] = failId
+                record['latest'] = True
+                latestPerFailure = db((db.reviews.failureId == failId)&(db.reviews.latest == True)).select()
+                for rev in latestPerFailure:
+                    rev['latest'] = False
+                    rec = dict(rev)
+                    rev.update_record(**rec)
+                db.reviews.update_or_insert(**record)
+        response.flash = 'form accepted'
+        redirect(URL('index'))
+    elif form.errors:
+        #mGrid = multiSelectGrid.element('web2py_grid')
+        #selected = multiSelectGrid.elements(_name='records',_type='checkbox')
+        print request.post_vars
+        response.flash = 'form has errors'
+    else:
+        response.flash = 'please fill the form'
+    return dict(form=form, grid=multiSelectGrid)
+
+def edit():
+    hideTable = False
+    reviewId = request.args(0)
+    failureId = request.args(1)
+    if len(request.args) > 2:
+        hideTable = request.args(2)
+       
+    # Multi-select grid
+    tcId = db((db.failures.id==failureId)&(db.failures.testcaseId==db.testcases.id)).select(db.testcases.id)[0].id
+    multiSelectGrid = testcaseGrid([tcId], False)
+    multiSelectGrid.elements(_type='submit',_value='Submit',replace=None)  #remove selectable's checkboxes
+    multiSelectGrid.elements(_class='w2p_export_menu',replace=None)
+        
+    table = ''
+    if hideTable == False:
+        table = reviewView(failureId)[0]
+    
+    review = db.reviews(reviewId) or redirect(URL('error'))
+
+    if review.reviewDate == '':
+        review.reviewDate = datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')
+    
+    db.reviews.id.readable=False # Since we do not want to expose the id field on the grid
+    db.reviews.id.writable=False
+    db.reviews.failureId.readable=False
+    db.reviews.failureId.writable=False
+    db.reviews.reviewDate.writable=False
+    db.reviews.latest.readable=False
+    db.reviews.latest.writable=False
+    
+    form = SQLFORM(db.reviews, review, deletable=False)
+    if form.validate():
+        if form.deleted:
+            db(db.reviews.id==reviewId).delete()
+            redirect(URL('index'))
+        else:
+            record = dict(form.vars)
+            record['reviewDate'] = review.reviewDate
+            print "HIDE TABLE: " + str(hideTable)
+            if hideTable:
+                record['latest'] = True
+            print record
+            review.update_record(**record)
+            response.flash = 'records changed'
+            table = reviewView(failureId, True)[0]
+            redirect(URL('index'))
+
+    return dict(form=form, table=table, grid=multiSelectGrid)
+
+
+def user():
+    """
+    exposes:
+    http://..../[app]/default/user/login
+    http://..../[app]/default/user/logout
+    http://..../[app]/default/user/register
+    http://..../[app]/default/user/profile
+    http://..../[app]/default/user/retrieve_password
+    http://..../[app]/default/user/change_password
+    http://..../[app]/default/user/manage_users (requires membership in
+    use @auth.requires_login()
+        @auth.requires_membership('group name')
+        @auth.requires_permission('read','table name',record_id)
+    to decorate functions that need access control
+    """
+    return dict(form=auth())
+
+@cache.action()
+def download():
+    """
+    allows downloading of uploaded files
+    http://..../[app]/default/download/[filename]
+    """
+    return response.download(request, db)
+
+
+def call():
+    """
+    exposes services. for example:
+    http://..../[app]/default/call/jsonrpc
+    decorate with @services.jsonrpc the functions to expose
+    supports xml, json, xmlrpc, jsonrpc, amfrpc, rss, csv
+    """
+    return service()
+
+
+@auth.requires_signature()
+def data():
+    """
+    http://..../[app]/default/data/tables
+    http://..../[app]/default/data/create/[table]
+    http://..../[app]/default/data/read/[table]/[id]
+    http://..../[app]/default/data/update/[table]/[id]
+    http://..../[app]/default/data/delete/[table]/[id]
+    http://..../[app]/default/data/select/[table]
+    http://..../[app]/default/data/search/[table]
+    but URLs must be signed, i.e. linked with
+      A('table',_href=URL('data/tables',user_signature=True))
+    or with the signed load operator
+      LOAD('default','data.load',args='tables',ajax=True,user_signature=True)
+    """
+    return dict(form=crud())

@@ -1,0 +1,5 @@
+{{extend 'layout.html'}}
+<h3>Multi-Create Review</h3>
+<h4>Selected Failures:</h4>
+{{=grid}}
+{{=form}}

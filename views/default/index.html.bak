@@ -1,0 +1,25 @@
+{{extend 'layout.html'}}
+
+{{=form}}
+<table style="font-weight:bold;font-size:24px;">
+<tr>
+<td width=175>
+    <a href='/RegressionReport/default/index?keywords=runs.date+contains+"{{=yesterday}}"'>Yesterday</a>
+</td>
+<td width=175>
+    <a href='/RegressionReport/default/index?keywords=runs.date+contains+"{{=today}}"'>Today</a>
+</td>
+<td width=175>
+    <a href='/RegressionReport/default/index?keywords=reviews.action+contains+%22to+investigate%22+or+reviews.action+%3D+%22%22'>Needs Attention</a>
+</td>
+<td width=175>
+    <a href='/RegressionReport/beingFixed'>Being Fixed</a>
+</td>
+</tr>
+</table>
+{{=grid}}
+
+{{ if loaded is not None: }}
+<h2>Loaded File:</h2>
+{{=loaded}}
+{{pass}}

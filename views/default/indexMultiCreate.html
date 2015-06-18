@@ -1,0 +1,41 @@
+{{extend 'layout.html'}}
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+<script src="{{=URL('static','jQuery-Multi-Select/dragcheck.js')}}"></script>
+<script src="{{=URL('static','ShiftCheckboxes/src/jquery.tshift.min.js')}}"></script>
+
+{{=form}}
+<table style="font-weight:bold;font-size:24px;">
+<tr>
+<td width=175>
+    <a href='/RegressionReport/default/indexMultiCreate?keywords=runs.date+contains+"{{=yesterday}}"'>Yesterday</a>
+</td>
+<td width=175>
+    <a href='/RegressionReport/default/indexMultiCreate?keywords=runs.date+contains+"{{=today}}"'>Today</a>
+</td>
+<td width=175>
+    <a href='/RegressionReport/default/indexMultiCreate?keywords=reviews.latest+%3D+%22on%22+and+reviews.action+contains+%22to+investigate%22+or+reviews.action+%3D+%22%22'>Needs Attention</a>
+</td>
+</tr>
+</table>
+{{=grid}}
+<a href='/RegressionReport/default/index'>Disable Multi-Create</a>
+{{ if loaded is not None: }}
+<h2>Loaded File:</h2>
+{{=loaded}}
+{{pass}}
+
+<script>
+$(window).load(function(){
+$('table tbody').dragcheck({
+container: 'tr',
+onSelect: function(obj, state) {
+        obj.prop('checked', state);
+    }
+});
+});
+    
+$(function() {
+        $("#main").tshift();
+});
+</script>
